@@ -10,12 +10,12 @@ from copy import deepcopy
 from allennlp.data.tokenizers.spacy_tokenizer import SpacyTokenizer
 
 from sentence_transformers import SentenceTransformer
-from value_matching.spider_db_context import SpiderDBContext
-from spider_utils.utils import read_single_dataset_schema_from_database, remove_conds
+from utils.spider_db_context import SpiderDBContext
 from utils.recall_checker_utils import RecallChecker
 from utils.sql_utils import add_values, sql_nested_query_tmp_name_convert, sql_string_format
-from spider_utils.evaluation.process_sql import get_schema, get_schema_from_json
-from spider_utils.evaluation.evaluate import Evaluator, build_foreign_key_map_from_json, rebuild_sql
+from utils.spider_utils.utils import read_single_dataset_schema_from_database, remove_conds
+from utils.spider_utils.evaluation.process_sql import get_schema, get_schema_from_json
+from utils.spider_utils.evaluation.evaluate import Evaluator, build_foreign_key_map_from_json, rebuild_sql
 from configs.config import DIR_PATH, SERIALIZE_DATA_DIR, RETRIEVAL_MODEL_DIR, \
     RETRIEVAL_MODEL_EMBEDDING_DIMENSION
 

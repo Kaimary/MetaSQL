@@ -4,9 +4,9 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import DefaultDict
 
-from spider_utils.evaluation.evaluate import Evaluator
-from spider_utils.evaluation.evaluate import build_foreign_key_map_from_json
-from value_matching.spider_db_context import is_number
+from utils.spider_utils.evaluation.evaluate import Evaluator
+from utils.spider_utils.evaluation.evaluate import build_foreign_key_map_from_json
+from utils.spider_db_context import is_number
 
 SQL_KEYWORDS = ['SELECT', 'FROM', 'JOIN', 'ON', 'AS', 'WHERE', 'GROUP', 'BY', 'HAVING', \
     'ORDER', 'LIMIT', 'INTERSECT', 'UNION', 'EXCEPT', 'NOT', 'BETWEEN', 'IN', 'LIKE', 'IS', \

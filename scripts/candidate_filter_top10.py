@@ -6,10 +6,10 @@ from tqdm import tqdm
 from copy import deepcopy
 from nltk import WordNetLemmatizer
 
-from value_matching.spider_db_context import SpiderDBContext, is_number
+from utils.spider_db_context import SpiderDBContext, is_number
 from allennlp.data.tokenizers.spacy_tokenizer import SpacyTokenizer
-from spider_utils.utils import is_consistent_columns, is_same_type_columns, read_single_dataset_schema_from_database
-from spider_utils.evaluation.evaluate1 import rebuild_sql, build_foreign_key_map_from_json, Evaluator
+from utils.spider_utils.utils import is_consistent_columns, is_same_type_columns, read_single_dataset_schema_from_database
+from utils.spider_utils.evaluation.evaluate1 import rebuild_sql, build_foreign_key_map_from_json, Evaluator
 from utils.sql_utils import sql_nested_query_tmp_name_convert, sql_string_format
 
 LEMMATIZER = WordNetLemmatizer()
