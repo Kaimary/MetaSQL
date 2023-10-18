@@ -6,7 +6,7 @@ from allennlp.data import Tokenizer, Token
 from ordered_set import OrderedSet
 from unidecode import unidecode
 from allenmodels.dataset_readers.dataset_utils.query_to_toks import is_number
-from spider_utils.utils import TableColumn, read_dataset_schema, read_dataset_values
+from utils.spider_utils.utils import TableColumn, read_dataset_schema, read_dataset_values
 
 # == stop words that will be omitted by ContextGenerator
 STOP_WORDS = {"", "being", "-", "over", "through", "yourselves", "before", ",", "should",

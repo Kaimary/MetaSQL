@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 .vscode/
 
+evaluation.py
 /saved_models
 /debug_scripts
 /gpt_gap_bridge_files

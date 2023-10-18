@@ -1,18 +1,14 @@
+import json
 from typing import List, Union, Tuple
 from overrides import overrides
 
-import json
-import heapq
-import numpy as np
-import pandas as pd
-
 from allennlp.data import DatasetReader
-from allennlp.data.fields import ArrayField, ListField, MetadataField
+from allennlp.data.fields import ListField, MetadataField
 from allennlp.data.instance import Instance
 from allenmodels.dataset_readers.dataset_utils.utils import sql_format
 from allenmodels.dataset_readers.ir_reader import IRDatasetReader
 
-from spider_utils.utils import find_relationship_tables, read_single_dataset_schema, read_single_dataset_schema_from_database
+from utils.spider_utils.utils import find_relationship_tables, read_single_dataset_schema_from_database
 from allenmodels.dataset_readers.dataset_utils.multi_grained_label_utils import query_to_scene_graph_labels, sql_to_phrases
 
 @DatasetReader.register("listwise_pair_ranker_reader")

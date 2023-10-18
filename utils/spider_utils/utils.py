@@ -13,7 +13,7 @@ from unidecode import unidecode
 from collections import defaultdict
 from typing import List, Dict, Optional, Any
 
-from spider_utils.evaluation.process_sql import get_tables_with_alias, parse_sql
+from .evaluation.process_sql import get_tables_with_alias, parse_sql
 
 COLUMN_TYPE_MAP = {
     'text': 'text',

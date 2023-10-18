@@ -249,7 +249,7 @@ fi
 # Value filtered
 echo "INFO     [Stage 3-(6)] Postprocessing ......"
 if [ -f $RERANKER_MODEL_OUTPUT_SQL_FILE -a ! -f $VALUE_FILTERED_OUTPUT_TOPK_SQL_FILE ]; then
-    python3 -m value_matching.candidate_filter_top10 "$TEST_FILE" "$NL2SQL_PREDS_FILE" "$RERANKER_INPUT_FILE" \
+    python3 -m scripts.candidate_filter_top10 "$TEST_FILE" "$NL2SQL_PREDS_FILE" "$RERANKER_INPUT_FILE" \
     "$RERANKER_MODEL_OUTPUT_TOPK_SQL_FILE" "$TABLES_FILE" "$DB_DIR" \
     "$VALUE_FILTERED_OUTPUT_SQL_FILE" "$VALUE_FILTERED_OUTPUT_TOPK_SQL_FILE" || exit $?
     echo "INFO     Postprocessing complete!"
@@ -264,7 +264,7 @@ echo "INFO     Spider script evaluating ......"
 if [ -f $VALUE_FILTERED_OUTPUT_SQL_FILE -a ! -f $EVALUATE_OUTPUT_FILE ]; then
     # python3 -m datagen.postprocess_script "$RERANKER_INPUT_FILE" "$VALUE_FILTERED_OUTPUT_SQL_FILE" \
     # "$MODEL_OUTPUT_FILE" "$FINAL_OUTPUT_FILE"
-    python3 -m spider_utils.evaluation.evaluate --gold "data/test_gold.sql" --pred "$VALUE_FILTERED_OUTPUT_SQL_FILE" \
+    python3 -m utils.spider_utils.evaluation.evaluate --gold "data/test_gold.sql" --pred "$VALUE_FILTERED_OUTPUT_SQL_FILE" \
     --etype "match" --db "$DB_DIR" --table "$TABLES_FILE" \
     --candidates "$VALUE_FILTERED_OUTPUT_TOPK_SQL_FILE" > "$EVALUATE_OUTPUT_FILE"
     echo "Spider evaluation complete! Results are saved in \`$EVALUATE_OUTPUT_FILE\`"

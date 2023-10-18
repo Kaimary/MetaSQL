@@ -8,7 +8,7 @@ from allennlp.data.tokenizers import Tokenizer, WhitespaceTokenizer, PretrainedT
 
 # from dataset_readers.reranker_reader import RelationExtractor
 from allenmodels.dataset_readers.dataset_utils.schema import get_schema_from_json
-from spider_utils.evaluation.evaluate1 import build_foreign_key_map_from_json
+from utils.spider_utils.evaluation.evaluate1 import build_foreign_key_map_from_json
 logger = logging.getLogger(__name__)
 
 

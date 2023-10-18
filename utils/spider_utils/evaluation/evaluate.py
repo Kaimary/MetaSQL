@@ -24,8 +24,8 @@ import json
 import sqlite3
 import argparse
 from typing import List
-from spider_utils.evaluation.process_sql import get_schema, Schema, get_schema_from_json, get_sql
-from spider_utils.evaluation.syntactic_evaluate import *
+from .process_sql import get_schema, Schema, get_schema_from_json, get_sql
+from .syntactic_evaluate import *
 
 # Flag to disable value evaluation
 DISABLE_VALUE = True

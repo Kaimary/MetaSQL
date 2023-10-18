@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from configs.config import RERANKER_MISS_FILE_NAME, PRED_SQL_FILE_NAME
 from utils.sql_utils import sql_nested_query_tmp_name_convert
-from spider_utils.evaluation.evaluate import Evaluator, build_foreign_key_map_from_json, rebuild_sql
+from utils.spider_utils.evaluation.evaluate import Evaluator, build_foreign_key_map_from_json, rebuild_sql
 
 
 @click.command()

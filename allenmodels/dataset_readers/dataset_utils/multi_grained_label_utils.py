@@ -7,8 +7,8 @@ from nltk import WordNetLemmatizer
 from allenmodels.dataset_readers.dataset_utils.query_to_toks import is_number
 # from lm_scorer.models.auto import AutoLMScorer as LMScorer
 
-from spider_utils.evaluation.evaluate1 import rebuild_sql
-from spider_utils.evaluation.process_sql import WHERE_OPS
+from utils.spider_utils.evaluation.evaluate1 import rebuild_sql
+from utils.spider_utils.evaluation.process_sql import WHERE_OPS
 
 LEMMATIZER = WordNetLemmatizer()
 
