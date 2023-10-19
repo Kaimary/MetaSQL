@@ -74,7 +74,7 @@ def main(
 
     schema = {}
     table_dict = {}
-    serialization_dir = f'{DIR_PATH}{SERIALIZE_DATA_DIR}/{model_name}/{mode}'
+    serialization_dir = f'{DIR_PATH}{SERIALIZE_DATA_DIR}/{mode}'
     if not os.path.exists(serialization_dir): os.makedirs(serialization_dir)
     kmaps = build_foreign_key_map_from_json(tables_file)
     evaluator = Evaluator()

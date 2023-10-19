@@ -3,7 +3,7 @@ import click
 import json
 import sqlite3
 
-from spider_utils.utils import is_consistent_schema_database
+from utils.spider_utils.utils import is_consistent_schema_database
 from utils.sql_utils import fix_missing_join_condition
 from configs.config import DIR_PATH, SERIALIZE_DATA_DIR
 
@@ -14,9 +14,8 @@ from configs.config import DIR_PATH, SERIALIZE_DATA_DIR
 @click.argument("tables_file", type=click.Path(exists=True, dir_okay=False))
 @click.argument("db_dir", type=click.Path(exists=True, dir_okay=True))
 def main(test_file, model_output_file, metaor_output_file, tables_file, db_dir):
-    model_name = "lgesql"
     mode = "test"
-    serialization_dir = f'{DIR_PATH}{SERIALIZE_DATA_DIR}/{model_name}/{mode}'
+    serialization_dir = f'{DIR_PATH}{SERIALIZE_DATA_DIR}/{mode}'
     if not os.path.exists(serialization_dir): os.makedirs(serialization_dir)
     # schema = {}
     # table = {}

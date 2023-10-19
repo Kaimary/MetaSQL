@@ -5,9 +5,9 @@ from collections import defaultdict
 from dict_hash import dict_hash
 from copy import deepcopy
 
-from spider_utils.evaluation.evaluate import Evaluator, rebuild_sql, build_foreign_key_map_from_json
 from utils.sql_utils import sql_nested_query_tmp_name_convert
-from spider_utils.utils import fix_number_value, fix_query_toks_no_value
+from utils.spider_utils.utils import fix_number_value, fix_query_toks_no_value
+from utils.spider_utils.evaluation.evaluate import Evaluator, rebuild_sql, build_foreign_key_map_from_json
 from configs.config import DIR_PATH, RETRIEVAL_MODEL_DIR
 
 class RecallChecker():
