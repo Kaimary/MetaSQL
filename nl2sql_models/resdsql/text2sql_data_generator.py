@@ -41,8 +41,11 @@ def lista_contains_listb(lista, listb):
 
 def prepare_input_and_output(opt, ranked_data):
     question = ranked_data["question"]
-    candidates = ranked_data["candidates"]
-
+    tag=ranked_data["tags"].replace('\n','')
+    if tag=='none':
+        tag=''
+    meta=tag+'|'+str(ranked_data["rating"])+'|'+ranked_data['flag']+'|'
+    
     schema_sequence = ""
     for table_id in range(len(ranked_data["db_schema"])):
         table_name_original = ranked_data["db_schema"][table_id]["table_name_original"]
@@ -62,6 +65,9 @@ def prepare_input_and_output(opt, ranked_data):
                 column_info = table_name_original + "." + column_name_original
 
             column_info_list.append(column_info)
+        
+        if opt.target_type == "natsql":
+            column_info_list.append(table_name_original + ".*")
     
         # add column names
         schema_sequence += " , ".join(column_info_list)
@@ -75,11 +81,19 @@ def prepare_input_and_output(opt, ranked_data):
     while "  " in schema_sequence:
         schema_sequence = schema_sequence.replace("  ", " ")
 
-    # input_sequence = question + schema sequence
-    input_sequence = [question + " | " + candidate + schema_sequence for candidate in candidates]
-    
-    output_sequence = []
-    if "labels" in ranked_data.keys(): output_sequence = ranked_data['labels']
+    input_sequence = question + schema_sequence
+    input_sequence = meta +question + schema_sequence
+        
+    if opt.output_skeleton:
+        if opt.target_type == "sql":
+            output_sequence = ranked_data["sql_skeleton"] + " | " + ranked_data["norm_sql"]
+        elif opt.target_type == "natsql":
+            output_sequence = ranked_data["natsql_skeleton"] + " | " + ranked_data["norm_natsql"]
+    else:
+        if opt.target_type == "sql":
+            output_sequence = ranked_data["norm_sql"]
+        elif opt.target_type == "natsql":
+            output_sequence = ranked_data["norm_natsql"]
 
     return input_sequence, output_sequence
 
@@ -88,19 +102,20 @@ def generate_train_ranked_dataset(opt):
         dataset = json.load(f)
     
     output_dataset = []
-    for data in dataset:
+    for data_id, data in enumerate(dataset):
         ranked_data = dict()
         ranked_data["question"] = data["question"]
-        # ranked_data["sql"] = data["sql"] # unused
-        # ranked_data["norm_sql"] = data["norm_sql"]
-        # ranked_data["sql_skeleton"] = data["sql_skeleton"]
-        # ranked_data["natsql"] = data["natsql"] # unused
-        # ranked_data["norm_natsql"] = data["norm_natsql"]
-        # ranked_data["natsql_skeleton"] = data["natsql_skeleton"]
+        ranked_data["sql"] = data["sql"] # unused
+        ranked_data["norm_sql"] = data["norm_sql"]
+        ranked_data["sql_skeleton"] = data["sql_skeleton"]
+        ranked_data["natsql"] = data["natsql"] # unused
+        ranked_data["norm_natsql"] = data["norm_natsql"]
+        ranked_data["natsql_skeleton"] = data["natsql_skeleton"]
         ranked_data["db_id"] = data["db_id"]
         ranked_data["db_schema"] = []
-        ranked_data["candidates"]=data["candidates"]
-        ranked_data["labels"]=data["labels"]
+        ranked_data["tags"]=data["tags"]
+        ranked_data["rating"]=data["rating"]
+        ranked_data["flag"]=data["flag"]
 
         # record ids of used tables
         used_table_ids = [idx for idx, label in enumerate(data["table_labels"]) if label == 1]
@@ -183,13 +198,20 @@ def generate_eval_ranked_dataset(opt):
 
     table_coverage_state_list, column_coverage_state_list = [], []
     output_dataset = []
-    for data in dataset:
+    for data_id, data in enumerate(dataset):
         ranked_data = dict()
         ranked_data["question"] = data["question"]
+        ranked_data["sql"] = data["sql"]
+        ranked_data["norm_sql"] = data["norm_sql"]
+        ranked_data["sql_skeleton"] = data["sql_skeleton"]
+        ranked_data["natsql"] = data["natsql"]
+        ranked_data["norm_natsql"] = data["norm_natsql"]
+        ranked_data["natsql_skeleton"] = data["natsql_skeleton"]
         ranked_data["db_id"] = data["db_id"]
         ranked_data["db_schema"] = []
-        ranked_data["candidates"]=data["candidates"]
-        if "labels" in data.keys(): ranked_data["labels"]=data["labels"]
+        ranked_data["tags"]=data["tags"]
+        ranked_data["rating"]=data["rating"]
+        ranked_data["flag"]=data["flag"]
 
 
         table_pred_probs = list(map(lambda x:round(x,4), data["table_pred_probs"]))
