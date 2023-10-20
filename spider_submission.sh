@@ -152,7 +152,6 @@ if [ ! -f $NL2SQL_PREDS_FILE ]; then
         --saved_model "$NL2SQL_MODEL_DIR" --output_path "$NL2SQL_PREDS_FILE" || exit $?
         ;;
         "resdsql")
-        echo "resdsql"
         python -m nl2sql_models.resdsql.preprocessing --mode test --table_path $TABLES_FILE --input_dataset_path "./data/dev.json" \
         --output_dataset_path $EXPERIMENT_DIR_NAME/preprocessed_test.json --db_path $DB_DIR --target_type sql --metadata_dict_path "$META_DICT_FILE" \
         --metadata_output_path "$META_FORMAT_OUTPUT_FILE" 
@@ -177,7 +176,6 @@ if [ ! -f $NL2SQL_PREDS_FILE ]; then
         --target_type "sql" \
         --output "$NL2SQL_PREDS_FILE" \
         --db_path $db_path
-
         ;;
         "gap")
         echo "gap"
@@ -273,7 +271,6 @@ else
     # exit;
 fi
 
-
 # Inference for top-k
 echo "INFO     [Stage 3-(4)] Second-stage re-ranking top-k inferencing ....."
 if [ -f $RERANKER_MODEL_FILE -a ! -f $RERANKER_MODEL_OUTPUT_TOPK_FILE ]; then
@@ -319,9 +316,7 @@ fi
 # Final Evaluation
 echo "INFO     Spider script evaluating ......"
 if [ -f $VALUE_FILTERED_OUTPUT_SQL_FILE -a ! -f $EVALUATE_OUTPUT_FILE ]; then
-    # python3 -m datagen.postprocess_script "$RERANKER_INPUT_FILE" "$VALUE_FILTERED_OUTPUT_SQL_FILE" \
-    # "$MODEL_OUTPUT_FILE" "$FINAL_OUTPUT_FILE"
-    python3 -m utils.spider_utils.evaluation.evaluate --gold "data/test_gold.sql" --pred "$VALUE_FILTERED_OUTPUT_SQL_FILE" \
+    python3 -m utils.spider_utils.evaluation.evaluate --gold "data/dev_gold.sql" --pred "$VALUE_FILTERED_OUTPUT_SQL_FILE" \
     --etype "match" --db "$DB_DIR" --table "$TABLES_FILE" \
     --candidates "$VALUE_FILTERED_OUTPUT_TOPK_SQL_FILE" > "$EVALUATE_OUTPUT_FILE"
     echo "Spider evaluation complete! Results are saved in \`$EVALUATE_OUTPUT_FILE\`"
