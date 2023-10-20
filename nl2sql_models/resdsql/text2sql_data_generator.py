@@ -27,6 +27,7 @@ def parse_option():
                 help = 'whether to add skeleton in the output sequence.')
     parser.add_argument("--target_type", type = str, default = "sql",
                 help = "sql or natsql.")
+    parser.add_argument("--meta", type = int, default =0)
 
     opt = parser.parse_args()
 
@@ -40,11 +41,14 @@ def lista_contains_listb(lista, listb):
     return 1
 
 def prepare_input_and_output(opt, ranked_data):
+
+    
     question = ranked_data["question"]
-    tag=ranked_data["tags"].replace('\n','')
-    if tag=='none':
-        tag=''
-    meta=tag+'|'+str(ranked_data["rating"])+'|'+ranked_data['flag']+'|'
+    if opt.meta==1:
+        tag=ranked_data["tags"].replace('\n','')
+        if tag=='none':
+            tag=''
+        meta=tag+'|'+str(ranked_data["rating"])+'|'+ranked_data['flag']+'|'
     
     schema_sequence = ""
     for table_id in range(len(ranked_data["db_schema"])):
@@ -82,7 +86,8 @@ def prepare_input_and_output(opt, ranked_data):
         schema_sequence = schema_sequence.replace("  ", " ")
 
     input_sequence = question + schema_sequence
-    input_sequence = meta +question + schema_sequence
+    if opt.meta==1:
+        input_sequence = meta +question + schema_sequence
         
     if opt.output_skeleton:
         if opt.target_type == "sql":
@@ -113,9 +118,11 @@ def generate_train_ranked_dataset(opt):
         ranked_data["natsql_skeleton"] = data["natsql_skeleton"]
         ranked_data["db_id"] = data["db_id"]
         ranked_data["db_schema"] = []
-        ranked_data["tags"]=data["tags"]
-        ranked_data["rating"]=data["rating"]
-        ranked_data["flag"]=data["flag"]
+        
+        if opt.meta==1:
+            ranked_data["tags"]=data["tags"]
+            ranked_data["rating"]=data["rating"]
+            ranked_data["flag"]=data["flag"]
 
         # record ids of used tables
         used_table_ids = [idx for idx, label in enumerate(data["table_labels"]) if label == 1]
@@ -209,9 +216,10 @@ def generate_eval_ranked_dataset(opt):
         ranked_data["natsql_skeleton"] = data["natsql_skeleton"]
         ranked_data["db_id"] = data["db_id"]
         ranked_data["db_schema"] = []
-        ranked_data["tags"]=data["tags"]
-        ranked_data["rating"]=data["rating"]
-        ranked_data["flag"]=data["flag"]
+        if opt.meta==1:
+            ranked_data["tags"]=data["tags"]
+            ranked_data["rating"]=data["rating"]
+            ranked_data["flag"]=data["flag"]
 
 
         table_pred_probs = list(map(lambda x:round(x,4), data["table_pred_probs"]))

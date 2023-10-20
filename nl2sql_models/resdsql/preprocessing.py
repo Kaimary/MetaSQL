@@ -2,7 +2,7 @@ import re
 import json
 import argparse
 
-from nl2sql_models.utils.bridge_content_encoder import get_database_matches
+from nl2sql_models.resdsql.utils.bridge_content_encoder import get_database_matches
 from sql_metadata import Parser
 from tqdm import tqdm
 
@@ -12,8 +12,10 @@ sql_keywords = ['select', 'from', 'where', 'group', 'order', 'limit', 'intersect
 
 def parse_option():
     parser = argparse.ArgumentParser("")
-    
     parser.add_argument('--mode', type = str, default = "train")
+    parser.add_argument('--meta', type = int, default = 0)
+    parser.add_argument('--metadata_dict_path', type = str, default = "meta_dict.txt")
+    parser.add_argument('--metadata_output_path', type = str, default = "metadata.txt")
     parser.add_argument('--table_path', type = str, default = "./data/spider/tables.json")
     parser.add_argument('--input_dataset_path', type = str, default = "./data/spider/train_spider.json", 
                         help = '''
@@ -267,7 +269,32 @@ def isFloat(string):
                 return False
         return True
 
+import copy
+def get_meta_inputfile(opt):
+    f = open(opt.metadata_output_path, 'r')
+    metadata = [line.strip().split(', ') for line in f.readlines()]
+    f = open(opt.metadata_dict_path, 'r')
+    meta_dict = {}
+    for iidx, line in enumerate(f.readlines()):
+        meta_dict[iidx] = line.strip()
+    print(metadata[0])
+    with open("./data/dev.json") as f:
+       ff=json.load(f)
+    input=[]
+    for index,metas in enumerate(metadata):       
+        for meta in metas:  
+            temp=copy.deepcopy(ff[index])          
+            d=meta_dict[int(meta)].split(",",1)
+            temp['rating']=d[0]
+            temp['tags']=d[1]
+            temp['flag']="CORRECT SOLUTION"
+            input.append(temp)
+
+    with open(opt.input_dataset_path, 'w') as json_file:
+        json.dump(input, json_file,indent=4)
 def main(opt):
+    if opt.meta==1:
+        get_meta_inputfile(opt)
     dataset = json.load(open(opt.input_dataset_path))
     all_db_infos = json.load(open(opt.table_path))
     
@@ -305,9 +332,10 @@ def main(opt):
         question = data["question"].replace("\u2018", "'").replace("\u2019", "'").replace("\u201c", "'").replace("\u201d", "'").strip()
         db_id = data["db_id"]
         # print(1)
-        tags=data["tags"]
-        flag=data["flag"]
-        rating=data["rating"]
+        if opt.meta==1:
+            tags=data["tags"]
+            flag=data["flag"]
+            rating=data["rating"]
 
         
         if opt.mode == "test":
@@ -355,10 +383,11 @@ def main(opt):
         preprocessed_data["fk"] = db_schemas[db_id]["fk"]
         preprocessed_data["table_labels"] = []
         preprocessed_data["column_labels"] = []
-
-        preprocessed_data["tags"]=tags
-        preprocessed_data["flag"]=flag
-        preprocessed_data["rating"]=rating
+       
+        if opt.meta==1:
+            preprocessed_data["tags"]=tags
+            preprocessed_data["flag"]=flag
+            preprocessed_data["rating"]=rating
         
         # add database information (including table name, column name, ..., table_labels, and column labels)
         for table in db_schemas[db_id]["schema_items"]:

@@ -8,14 +8,14 @@ import torch.optim as optim
 from tqdm import tqdm
 from copy import deepcopy
 from tokenizers import AddedToken
-from nl2sql_models.utils.classifier_metric.evaluator import cls_metric, auc_metric
+from nl2sql_models.resdsql.utils.classifier_metric.evaluator import cls_metric, auc_metric
 from torch.utils.data import DataLoader
 from transformers import RobertaTokenizerFast, XLMRobertaTokenizerFast
-from nl2sql_models.utils.classifier_model import MyClassifier
-from nl2sql_models.utils.classifier_loss import ClassifierLoss
+from nl2sql_models.resdsql.utils.classifier_model import MyClassifier
+from nl2sql_models.resdsql.utils.classifier_loss import ClassifierLoss
 from transformers.trainer_utils import set_seed
 from torch.utils.tensorboard import SummaryWriter
-from utils.load_dataset import ColumnAndTableClassifierDataset
+from nl2sql_models.resdsql.utils.load_dataset import ColumnAndTableClassifierDataset
 
 def parse_option():
     parser = argparse.ArgumentParser("command line arguments for fine-tuning schema item classifier.")

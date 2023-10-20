@@ -168,3 +168,5 @@ evaluation.py
 /data
 /nl2sql_models/lgesql/pretrained_models/*
 /roberta-large
+spider_submission copy.sh
+meta_acc_checker.py

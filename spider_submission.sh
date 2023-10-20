@@ -44,6 +44,7 @@ NL2SQL_MODEL_DIR=$(cut -d'@' -f21 <<< "$output")
 MODEL_BIN=$(cut -d'@' -f22 <<< "$output")
 SCHEMA_CLASSIFIER_MODEL_DIR=$(cut -d'@' -f23 <<< "$output")
 SERIALIZE_DATA_DIR=$(cut -d'@' -f24 <<< "$output")
+db_path="./data/database"
 
 printf -v NL2SQL_MODEL_DIR "$NL2SQL_MODEL_DIR" $MODEL_NAME
 printf -v NL2SQL_META_MODEL_DIR "$NL2SQL_META_MODEL_DIR" $MODEL_NAME
@@ -80,6 +81,11 @@ else
 fi
 
 # Get the predictions from the LGESQL+Meta model
+echo $SCHEMA_CLASSIFIER_MODEL_DIR
+echo $NL2SQL_META_PREDS_FILE
+echo $TEST_FILE
+echo $META_FORMAT_OUTPUT_FILE
+echo $db_path
 echo "INFO     [Stage 2-(1)] NL2SQL+meta model inferencing ......"
 if [ ! -f $NL2SQL_META_PREDS_FILE ]; then
     case $MODEL_NAME in
@@ -91,6 +97,30 @@ if [ ! -f $NL2SQL_META_PREDS_FILE ]; then
         ;;
         "resdsql")
         echo "resdsql"
+        python -m nl2sql_models.resdsql.preprocessing --mode test --table_path $TABLES_FILE --input_dataset_path "./data/dev_for_resd.json" \
+        --output_dataset_path $EXPERIMENT_DIR_NAME/preprocessed_test.json --db_path $DB_DIR --target_type sql --metadata_dict_path "$META_DICT_FILE" \
+        --metadata_output_path "$META_FORMAT_OUTPUT_FILE" --meta 1
+        python -m nl2sql_models.resdsql.schema_item_classifier --batch_size 32 --device 0 --seed 42 \
+        --save_path "./saved_models/nl2sql_models/resdsql/resdsql_schema_item_classifier" \
+        --dev_filepath $EXPERIMENT_DIR_NAME/preprocessed_test.json \
+        --output_filepath $EXPERIMENT_DIR_NAME/test_with_probs.json \
+        --use_contents --add_fk_info --mode "test"
+        python -m nl2sql_models.resdsql.text2sql_data_generator \
+        --input_dataset_path $EXPERIMENT_DIR_NAME/test_with_probs.json \
+        --output_dataset_path $EXPERIMENT_DIR_NAME/resdsql_test.json \
+        --topk_table_num 4 --topk_column_num 5 --mode test --use_contents \
+        --add_fk_info --output_skeleton --target_type sql
+        python -m nl2sql_models.resdsql.text2sql \
+        --batch_size 4 --device 0 \
+        --seed 42 --save_path "./saved_models/nl2sql_models/resdsql/text2sql-t5-large/checkpoint-30576" \
+        --mode "eval" --dev_filepath $EXPERIMENT_DIR_NAME/resdsql_test.json \
+        --original_dev_filepath "./data/dev.json" \
+        --num_beams 12 \
+        --num_return_sequences 8 \
+        --target_type "sql" \
+        --output "$NL2SQL_META_PREDS_FILE" \
+        --db_path $db_path
+        
         ;;
         "gap")
         echo "gap"
@@ -110,6 +140,8 @@ else
     echo "WARNING     \`$LGESQL_META_MODEL_FILE\` not exists or \`$NL2SQL_META_PREDS_FILE\` exists."
 fi
 
+
+echo $NL2SQL_PREDS_FILE
 # Get the predictions from the original LGESQL model
 echo "INFO     [Stage 2-(2)] NL2SQL model inferencing ......"
 if [ ! -f $NL2SQL_PREDS_FILE ]; then
@@ -121,6 +153,31 @@ if [ ! -f $NL2SQL_PREDS_FILE ]; then
         ;;
         "resdsql")
         echo "resdsql"
+        python -m nl2sql_models.resdsql.preprocessing --mode test --table_path $TABLES_FILE --input_dataset_path "./data/dev.json" \
+        --output_dataset_path $EXPERIMENT_DIR_NAME/preprocessed_test.json --db_path $DB_DIR --target_type sql --metadata_dict_path "$META_DICT_FILE" \
+        --metadata_output_path "$META_FORMAT_OUTPUT_FILE" 
+
+         python -m nl2sql_models.resdsql.schema_item_classifier --batch_size 32 --device 0 --seed 42 \
+        --save_path "./saved_models/nl2sql_models/resdsql/resdsql_schema_item_classifier" \
+        --dev_filepath $EXPERIMENT_DIR_NAME/preprocessed_test.json \
+        --output_filepath $EXPERIMENT_DIR_NAME/test_with_probs.json \
+        --use_contents --add_fk_info --mode "test"
+        python -m nl2sql_models.resdsql.text2sql_data_generator \
+        --input_dataset_path $EXPERIMENT_DIR_NAME/test_with_probs.json \
+        --output_dataset_path $EXPERIMENT_DIR_NAME/resdsql_test.json \
+        --topk_table_num 4 --topk_column_num 5 --mode test --use_contents \
+        --add_fk_info --output_skeleton --target_type sql
+        python -m nl2sql_models.resdsql.text2sql \
+        --batch_size 4 --device 0 \
+        --seed 42 --save_path "./saved_models/nl2sql_models/resdsql/text2sql-t5-large/checkpoint-30576" \
+        --mode "eval" --dev_filepath $EXPERIMENT_DIR_NAME/resdsql_test.json \
+        --original_dev_filepath "./data/dev.json" \
+        --num_beams 12 \
+        --num_return_sequences 8 \
+        --target_type "sql" \
+        --output "$NL2SQL_PREDS_FILE" \
+        --db_path $db_path
+
         ;;
         "gap")
         echo "gap"

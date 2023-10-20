@@ -62,6 +62,9 @@ def main(
     elif model_name == "lgesql":
         lgesql = open(model_output_file, 'r')
         preds = [line.strip() for line in lgesql.readlines()]
+    elif model_name == "resdsql":
+        resdsql = open(model_output_file, 'r')
+        preds = [line.strip() for line in resdsql.readlines()]
 
     t_cols_dict = defaultdict(dict)
     dbs_json_blob = json.load(open(tables_file, "r"))

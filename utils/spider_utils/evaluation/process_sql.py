@@ -357,7 +357,11 @@ def parse_condition(toks, start_idx, tables_with_alias, schema, default_tables=N
             idx += 1
 
         assert idx < len_ and toks[idx] in WHERE_OPS, "Error condition: idx: {}, tok: {}".format(idx, toks[idx])
-        op_id = WHERE_OPS.index(toks[idx])
+        try:
+            op_id = WHERE_OPS.index(toks[idx])
+        except Exception as e:
+            return 
+
         idx += 1
         val1 = val2 = None
         if op_id == WHERE_OPS.index('between'):  # between..and... special case: dual values
