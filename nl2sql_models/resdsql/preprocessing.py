@@ -2,7 +2,7 @@ import re
 import json
 import argparse
 
-from utils.bridge_content_encoder import get_database_matches
+from nl2sql_models.utils.bridge_content_encoder import get_database_matches
 from sql_metadata import Parser
 from tqdm import tqdm
 
