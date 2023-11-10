@@ -1,0 +1,176 @@
+450, where
+100, where
+200, where
+300, where
+150, where
+250, where
+350, where
+100, order
+200, order
+300, order
+150, order
+250, order
+200, none
+100, none
+150, none
+450, where, join
+550, where, join
+200, where, join
+650, where, join
+300, where, join
+750, where, join
+400, where, join
+500, where, join
+600, where, join
+250, where, join
+700, where, join
+350, where, join
+200, group
+100, group
+150, group
+200, group, order
+300, group, order
+400, group, order
+250, group, order
+350, group, order
+400, where, subquery
+450, where, subquery
+500, where, subquery
+550, where, subquery
+800, where, join, compound
+550, where, join, compound
+650, where, join, compound
+750, where, join, compound
+850, where, join, compound
+500, where, join, compound
+950, where, join, compound
+600, where, join, compound
+700, where, join, compound
+450, group, join
+550, group, join
+200, group, join
+300, group, join
+400, group, join
+500, group, join
+250, group, join
+350, group, join
+450, join
+100, join
+550, join
+200, join
+650, join
+300, join
+500, join
+150, join
+250, join
+350, join
+450, group, order, join
+550, group, order, join
+650, group, order, join
+300, group, order, join
+750, group, order, join
+400, group, order, join
+500, group, order, join
+600, group, order, join
+700, group, order, join
+350, group, order, join
+400, where, compound
+450, where, compound
+500, where, compound
+550, where, compound
+450, order, join
+200, order, join
+300, order, join
+400, order, join
+850, order, join
+500, order, join
+250, order, join
+350, order, join
+550, where, order
+200, where, order
+300, where, order
+400, where, order
+250, where, order
+350, where, order
+400, compound
+450, compound
+450, where, order, join
+550, where, order, join
+650, where, order, join
+300, where, order, join
+750, where, order, join
+400, where, order, join
+850, where, order, join
+500, where, order, join
+600, where, order, join
+700, where, order, join
+350, where, order, join
+200, where, group
+250, where, group
+300, where, group
+350, where, group
+450, where, group, order
+550, where, group, order
+300, where, group, order
+400, where, group, order
+500, where, group, order
+650, group, join, compound
+500, group, join, compound
+550, group, join, compound
+400, group, compound
+450, group, compound
+500, group, join, subquery
+550, where, join, subquery
+650, where, join, subquery
+750, where, join, subquery
+850, where, join, subquery
+500, where, join, subquery
+600, where, join, subquery
+700, where, join, subquery
+800, where, group, order, join
+450, where, group, order, join
+550, where, group, order, join
+650, where, group, order, join
+750, where, group, order, join
+400, where, group, order, join
+500, where, group, order, join
+950, where, group, order, join
+600, where, group, order, join
+700, where, group, order, join
+450, where, group, join
+550, where, group, join
+650, where, group, join
+300, where, group, join
+750, where, group, join
+400, where, group, join
+500, where, group, join
+600, where, group, join
+350, where, group, join
+400, group, subquery
+450, group, subquery
+800, where, join, subquery, compound
+900, where, join, subquery, compound
+800, where, subquery, subquery
+850, where, subquery, subquery
+750, where, subquery, subquery
+600, where, group, subquery
+500, where, group, subquery
+550, where, group, subquery
+450, join, compound
+400, join, compound
+500, join, compound
+600, join, compound
+700, join, compound
+750, where, subquery, compound
+600, where, order, subquery
+650, where, order, subquery
+500, where, order, subquery
+600, group, order, compound
+800, where, order, join, subquery
+700, where, order, join, subquery
+850, where, join, subquery, subquery
+900, where, join, subquery, subquery
+950, where, join, subquery, subquery
+850, group, join, subquery, compound
+650, where, group, join, subquery
+550, where, group, compound

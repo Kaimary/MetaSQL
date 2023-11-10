@@ -1,0 +1,805 @@
+import re
+import json
+from copy import deepcopy
+from collections import defaultdict
+from typing import Dict, List, Set, Tuple
+import networkx as nx
+from nltk import WordNetLemmatizer
+# import matplotlib.pyplot as plt
+import sng_parser
+from allenmodels.dataset_readers.dataset_utils.query_to_toks import is_number
+# from lm_scorer.models.auto import AutoLMScorer as LMScorer
+
+from spider_utils.evaluation.evaluate1 import rebuild_sql
+from spider_utils.evaluation.process_sql import WHERE_OPS
+
+LEMMATIZER = WordNetLemmatizer()
+
+def build_join_path(tables, tables_file, db_id):
+    def _find_shortest_path(start, end, graph):
+        stack = [[start, []]]
+        visited = set()
+        while len(stack) > 0:
+            ele, history = stack.pop()
+            if ele == end:
+                return history
+            for node in graph[ele]:
+                if node[0] not in visited:
+                    stack.append((node[0], history + [(node[0], node[1])]))
+                    visited.add(node[0])
+
+    dbs_json_blob = json.load(open(tables_file, "r"))
+    graph = defaultdict(list)
+    table_list = []
+    dbtable = {}
+    for table in dbs_json_blob:
+        if db_id == table['db_id']:
+            dbtable = table
+            for acol, bcol in table["foreign_keys"]:
+                t1 = table["column_names"][acol][0]
+                t2 = table["column_names"][bcol][0]
+                graph[t1].append((t2, (acol, bcol)))
+                graph[t2].append((t1, (bcol, acol)))
+            table_list = [table for table in table["table_names_original"]]
+
+    table_alias_dict = {}
+    idx = 1
+
+    prev_table_count = len(tables)
+    candidate_tables = []
+    for table in tables:
+        for i, table1 in enumerate(table_list):
+            if table1.lower() == table:
+                candidate_tables.append(i)
+                break
+
+    ret = ""
+    new_tables = set()
+    after_table_count = 0
+    start = candidate_tables[0]
+    table_alias_dict[start] = idx
+    idx += 1
+    ret = "FROM {}".format(dbtable["table_names_original"][start].lower())
+    after_table_count += 1
+    try:
+        for end in candidate_tables[1:]:
+            if end in table_alias_dict:
+                continue
+            path = _find_shortest_path(start, end, graph)
+            # print("got path = {}".format(path))
+            prev_table = start
+            if not path:
+                table_alias_dict[end] = idx
+                idx += 1
+                ret = ""
+                continue
+            for node, (acol, bcol) in path:
+                if node in table_alias_dict:
+                    prev_table = node
+                    continue
+                table_alias_dict[node] = idx
+                idx += 1
+                ret = "{} JOIN {} ON {}.{} = {}.{}".format(ret, dbtable["table_names_original"][node].lower(),
+                                                            dbtable["table_names_original"][prev_table].lower(),
+                                                            dbtable["column_names_original"][acol][1].lower(),
+                                                            dbtable["table_names_original"][node].lower(),
+                                                            dbtable["column_names_original"][bcol][1].lower())
+                if node not in candidate_tables: 
+                    new_tables.add(dbtable["table_names_original"][node])
+                after_table_count += 1
+                prev_table = node
+
+    except:
+        print("\n!!Exception in adding join conditions!!")
+
+    return sorted(new_tables)
+
+def table_graph_types():
+    # Subject-Relationship-Object table graph
+    G1 = nx.DiGraph()
+    nx.add_path(G1, [1, 2])
+    nx.add_path(G1, [3, 2])
+    # Object with attributes table graph
+    G2 = nx.DiGraph()
+    nx.add_path(G2, [1, 2])
+    nx.add_path(G2, [1, 3])
+    # Object A with B with C table graph
+    G3 = nx.DiGraph()
+    nx.add_path(G3, [1, 2, 3])
+    return [G1, G2, G3]
+TABLE_GRAPHS = table_graph_types()
+
+
+def __CONVERT_TABLE_NAME(orig, schema):
+        for idx, t in enumerate(schema['table_names_original']):
+            if t.lower() == orig: return schema['table_names'][idx].lower()           
+def __CONVERT_TABLE_SEMANTICS(orig, schema):
+    # If 1) no underscore in the table name, or 2) no primary key, or 3) exisiting composite primary key, use the annotation directly;
+    # Otherwise, use the primary key as the table name or revert back to use the table name.
+    if '_' not in orig or \
+        not schema['primaries'][orig] or \
+            len(schema['primaries'][orig]) > 1: 
+            return  __CONVERT_TABLE_NAME(orig, schema)
+
+    pk = list(schema['primaries'][orig]).pop()
+    key = f'{orig}.{pk}'
+    pk_anno = schema['column_names_mapping'][key]
+    pk_anno_norm = pk_anno.replace('id', '').strip()
+    return pk_anno_norm
+
+def __CONVERT_COLUMN_NAME(orig, schema):
+    if '.' not in orig: return orig   # star case
+    return schema['column_names_mapping'][orig].replace(' id', '')
+def __CONVERT_OPERATOR_NAME(opt):
+    # WHERE_OPS = ('not', 'between', '=', '>', '<', '>=', '<=', '!=', 'in', 'like', 'is', 'exists')
+    if opt in [2, 10]: return ''
+    elif opt == 3: return 'greater than'
+    elif opt == 4: return 'less than'
+    elif opt == 5: return 'no less than'
+    elif opt == 6: return 'no more than'
+    elif opt == 7: return 'not'
+    elif opt == 8: return 'in'
+    elif opt == 9: return 'containing'
+    elif opt == 11: return 'existing'
+    else:
+        raise ValueError('Not supported operator type' % opt)
+def __CONVERT_UNIT_OPERATOR_NAME(opt):
+    # UNIT_OPS = ('none', '-', '+', "*", '/')
+    if opt == 1: return 'minus'
+    elif opt == 2: return 'plus'
+    elif opt == 3: return 'multiply'
+    elif opt == 4: return 'divide'
+    else: raise ValueError('Not supported unit operator type' % opt)
+def __CONVERT_AGG_NAME(agg):
+    # AGG_OPS = ('none', 'max', 'min', 'count', 'sum', 'avg')
+    if agg == 0: return ''
+    elif agg == 1: return 'maximum'
+    elif agg == 2: return 'minimum'
+    elif agg == 3: return 'number of'
+    elif agg == 4: return 'total'
+    elif agg == 5: return 'average'
+    else:
+        raise ValueError('Not supported aggregation type' % agg)
+def __CHECK_AGG_IN_SELECT(sql: Dict):
+    # 'select': (isDistinct(bool), [(agg_id, val_unit), (agg_id, val_unit), ...])
+    return sql['select'][1][0][0] > 0
+
+def __CHECK_ALIGN_WITH_COLUMNS(inter_col, outer_col, schema):
+    _, val_unit = inter_col
+    _, col_unit, _ = val_unit
+    _, col_name, _ = col_unit
+    col_name = col_name.strip('_')
+    col_name = __CONVERT_COLUMN_NAME(col_name, schema)
+    return col_name == outer_col
+
+def __parse_select(input):
+    output = []
+    _, cols = input
+    for col in cols:
+        agg_id, val_unit = col
+        _, col_unit, _ = val_unit
+        _, col_name, _ = col_unit
+        col_name = col_name.strip('_')
+        output.append((agg_id, col_name))
+
+    return output
+
+def __parse_from(input):
+    output = []
+    for table in input['table_units']:
+        type, table_unit = table
+        if type == 'sql': output.append((type, table_unit))
+        else:
+            tname = table_unit.strip('_')
+            output.append((type, tname))
+
+    return output
+
+def __parse_group(input):
+    if not input: return []
+
+    output = []
+    for col in input:
+        agg_id, col_name, _ = col
+        col_name = col_name.strip('_')
+        output.append((agg_id, col_name))
+
+    return output
+
+def __parse_order(input):
+    if not input: return "", []
+
+    output = []
+    kw, cols = input
+    for col in cols:
+        _, val_unit, _ = col
+        agg_id, col_name, _ = val_unit
+        col_name = col_name.strip('_')
+        output.append((agg_id, col_name))
+
+    return kw, output
+
+def query_to_scene_graph_labels(query: str):
+    graph = sng_parser.parse(query)
+    """
+    graph example
+    ================================================================ 
+    {
+        'entities': [{'head': 'concerts',
+               'lemma_head': 'concert',
+               'lemma_span': 'the most concert',
+               'modifiers': [{'dep': 'det', 'lemma_span': 'the', 'span': 'the'},
+                             {'dep': 'amod',
+                              'lemma_span': 'most',
+                              'span': 'most'}],
+               'span': 'the most concerts',
+               'span_bounds': (10, 13),
+               'type': 'unknown'}]
+        'relations': [{'lemma_relation': 'be',
+                    'object': 0,
+                    'relation': 'is',
+                    'subject': 1}]
+    }
+    """
+    object_entities = [entity['head'] for entity in graph['entities']]
+    # Maunal fix `i` `d` to `id`
+    fix_id = False
+    if all(t in object_entities for t in ['i', 'd']):
+        fix_id = True
+        object_entities[object_entities.index('i')] = 'id'
+        object_entities.remove('d')
+    subject_relation_object_triples = []
+    for r in graph['relations']:
+        object = graph['entities'][r['object']]['head']
+        relation = r['relation']
+        subject = graph['entities'][r['subject']]['head']
+        if fix_id and subject == 'd': continue
+        if fix_id and subject == 'i': subject = 'id'
+        subject_relation_object_triples.append(f'{subject} {relation} {object}')
+
+    return object_entities, subject_relation_object_triples
+
+def sql_to_phrases(sql: str, schema: Dict, db_id: str, relation_tables: Dict, kmaps: Dict, tables_file: str, database_path: str):
+    """
+    SQL phrases:
+    1. ORDER BY LIMIT 1 => argmax/argmin
+    2. JOIN 
+    3. Projection Aggregation with star
+    4. IUE
+    5. Where and/or
+    6. Order by count(*) with group
+    7. Nested query
+    """
+    
+    ################################
+    # val: number(float)/string(str)/sql(dict)
+    # col_unit: (agg_id, col_id, isDistinct(bool))
+    # val_unit: (unit_op, col_unit1, col_unit2)
+    # table_unit: (table_type, col_unit/sql)
+    # cond_unit: (not_op, op_id, val_unit, val1, val2)
+    # condition: [cond_unit1, 'and'/'or', cond_unit2, ...]
+    # sql {
+    #   'select': (isDistinct(bool), [(agg_id, val_unit), (agg_id, val_unit), ...])
+    #   'from': {'table_units': [table_unit1, table_unit2, ...], 'conds': condition}
+    #   'where': condition
+    #   'groupBy': [col_unit1, col_unit2, ...]
+    #   'orderBy': ('asc'/'desc', [val_unit1, val_unit2, ...])
+    #   'having': condition
+    #   'limit': None/limit value
+    #   'intersect': None/sql
+    #   'except': None/sql
+    #   'union': None/sql
+    # }
+    ################################
+    p_sql = rebuild_sql(db_id, database_path, sql.lower(), kmaps, tables_file, rebuild_col=False)
+    object_entities = []
+    phrases = []
+    # FROM(JOIN) feature
+    # If single query, add table name as entity; Otherwise, add join semantics as phrase
+    label, star_semantics = _dig_join_labels(p_sql['from'], schema, relation_tables)
+    output = __parse_from(p_sql['from'])
+    join_tables = set()
+    # join exists
+    if len(output) > 1:
+        # First, find all refered tables in the sql
+        ref_tables = set()
+        for tok in sql.split():
+            if '.' in tok and '"' not in tok and not is_number(tok):
+                match = re.search(r'[a-z_]+(?=.)', tok)
+                ref_tables.add(match.group(0))
+        # Second, find the tables used in join
+        for (_, t) in output:
+            join_tables.add(t)
+        #TODO Ignore nested sqls 
+        if len(join_tables) >= len(ref_tables):
+            unused_tables = sorted([t for t in join_tables if t not in ref_tables])
+            if unused_tables:
+                if all(ut in relation_tables.keys() for ut in unused_tables) or \
+                    (len(unused_tables) == 1 and all(LEMMATIZER.lemmatize(rt) in unused_tables[0] for rt in ref_tables)) or \
+                    (len(ref_tables) > 1 and build_join_path(ref_tables, tables_file, db_id) == unused_tables):
+                    pass
+                else: 
+                    label += f' [UNUSED]'
+    if not label: return object_entities, phrases  # Nested-From queries
+    if 'with ' in label: phrases.append(label)
+    else: object_entities.append(label)
+    grouping_table, grouping_col, grouping_label = _dig_group_labels(p_sql['groupBy'], schema, join_tables)
+    phrases, order_has_agg = _dig_order_labels(p_sql['orderBy'], p_sql['limit'], schema, star_semantics, grouping_table, grouping_col, phrases)
+    # Concatenate Where and Having predicates into a unified condition label
+    condition_label = ""
+    if p_sql['where']: 
+        where_label = _dig_where_having_labels(p_sql['where'], schema, relation_tables, star_semantics, grouping_table)
+        condition_label = where_label
+    if p_sql['having']: 
+        having_label = _dig_where_having_labels(p_sql['having'], schema, relation_tables, star_semantics, grouping_table)
+        having_label = __CONVERT_COLUMN_NAME(grouping_col, schema) + ' that ' + having_label
+        if condition_label:
+            condition_label += ' and ' + having_label
+        else:
+            condition_label = having_label
+    phrases, find_grouping_col, select_has_agg = \
+        _dig_select_labels(p_sql['select'], schema, star_semantics, grouping_table, grouping_col, phrases)
+    # If no aggregation found in the SQL, use grouping label
+    # Otherwise, skip the grouping label as its semantics has included in select/order/having
+    if not order_has_agg and not select_has_agg and not p_sql['having'] and grouping_label:
+        if find_grouping_col == 0: grouping_label += f' [MISSING]'
+        elif find_grouping_col == 1: grouping_label += f' [INACCURATE]'
+        phrases.append(grouping_label)
+    elif grouping_label:
+        if find_grouping_col == 0: phrases[-1] += f' [MISSING]'
+        elif find_grouping_col == 1: phrases[-1] += f' [INACCURATE]'
+    if p_sql['intersect']:
+        iue_label = _dig_iue_labels(p_sql['intersect'], p_sql['select'], schema, relation_tables, keyword=' and')
+        condition_label += iue_label
+    if p_sql['union']:
+        iue_label = _dig_iue_labels(p_sql['union'], p_sql['select'], schema, relation_tables, keyword=' or')
+        condition_label += iue_label
+    if p_sql['except']:
+        iue_label = _dig_iue_labels(p_sql['except'], p_sql['select'], schema, relation_tables)
+        condition_label += iue_label
+    if condition_label: phrases.append(condition_label)
+
+    return object_entities, phrases
+
+
+def _dig_join_labels(join: Dict, schema: Dict, relation_tables: Dict):
+    label = ""
+    star_semantics = {}
+
+    output = __parse_from(join)
+    # Only handle non-nested queries
+    if output[0][0] == 'sql': return label, star_semantics
+    _, tname_orig = output[0]
+    # If no table join, return the name of table as entity
+    if len(output) == 1:
+        label = __CONVERT_TABLE_NAME(tname_orig, schema)
+        # Obtain the *star* semantics from the primary key, 
+        # or derived from the table name if no meaningful semantics related to the key
+        star_semantics[tname_orig] = __CONVERT_TABLE_SEMANTICS(tname_orig, schema)
+        star_semantics['global'] = star_semantics[tname_orig]
+    else:
+        # Contruct the corresponding table graph
+        G = nx.DiGraph()
+        G.add_node(tname_orig)
+        prev = [tname_orig]
+        for (_, t) in output[1:]:
+            G.add_node(t)
+            add = False      
+            for tt in reversed(prev):
+                if f'{tt}-{t}' in schema['foreigns']:
+                    G.add_edge(t, tt)
+                    add = True
+                    break
+                elif f'{t}-{tt}' in schema['foreigns']:
+                    G.add_edge(tt, t)
+                    add = True
+                    break
+            # for tt in reversed(prev):
+            #     if tname_orig1 == tt: # Self join
+            #         G.add_edge(__CONVERT_TABLE_NAME(tt, schema), __CONVERT_TABLE_NAME(tt, schema))
+            #         add = True
+            #         break
+            # if not add and prev[-1] != t: G.add_edge(prev[-1], t)
+            if not add: G.add_edge(prev[-1], t)
+            prev.append(t)
+
+        # nx.draw(G, arrows=True, with_labels=True, font_weight='bold')
+        # plt.show()
+        # If three-tables queries, assign the label based on the graph topology
+        # We pre-define three types of graph topologies, where each represents a specific join semantics
+        if G.number_of_nodes() == 3:
+            if nx.is_isomorphic(G, TABLE_GRAPHS[0]):
+                relation = [node for node in G.nodes if G.out_degree(node) == 0][0]
+                subject_object = [node for node in G.nodes if G.in_degree(node) == 0]
+                assert len(subject_object) == 2
+                # Which is subject and which is object?
+                label = ' with '.join([__CONVERT_TABLE_NAME(n, schema) for n in subject_object])
+                star_semantics[subject_object[0]] = __CONVERT_TABLE_SEMANTICS(subject_object[1], schema)
+                star_semantics[subject_object[1]] = __CONVERT_TABLE_SEMANTICS(subject_object[0], schema)
+                star_semantics[relation] = 'UNK'
+                star_semantics['global'] = __CONVERT_TABLE_SEMANTICS(relation, schema)
+                # print(f'1: {label}, relation table: {relation}')
+            elif nx.is_isomorphic(G, TABLE_GRAPHS[1]):
+                subject = [node for node in G.nodes if G.in_degree(node) == 0]
+                others = [node for node in G.nodes if G.in_degree(node) != 0]
+                assert len(subject) == 1
+                label = __CONVERT_TABLE_NAME(subject[0], schema)
+                star_semantics[others[0]] = __CONVERT_TABLE_SEMANTICS(subject[0], schema)
+                star_semantics[others[1]] = __CONVERT_TABLE_SEMANTICS(subject[0], schema)
+                star_semantics[subject[0]] = __CONVERT_TABLE_SEMANTICS(subject[0], schema)
+                star_semantics['global'] = __CONVERT_TABLE_SEMANTICS(subject[0], schema)
+            elif nx.is_isomorphic(G, TABLE_GRAPHS[2]):
+                nodes = []
+                while(G.number_of_nodes()):
+                    cursor = [node for node in G.nodes if G.in_degree(node) == 0][0]
+                    nodes.append(cursor)
+                    G.remove_node(cursor)
+                label = ' with '.join([__CONVERT_TABLE_NAME(n, schema) for n in nodes])
+                # print('2: ', label)
+                star_semantics[nodes[0]] = ' with '.join([__CONVERT_TABLE_NAME(n, schema) for n in nodes[1:]])
+                star_semantics[nodes[1]] = ' with '.join([__CONVERT_TABLE_NAME(n, schema) for n in [nodes[0], nodes[2]]])
+                star_semantics[nodes[2]] = ' with '.join([__CONVERT_TABLE_NAME(n, schema) for n in nodes[:-1]])
+                star_semantics['global'] = ' with '.join([__CONVERT_TABLE_NAME(n, schema) for n in nodes])
+            else:
+                # nx.draw(G, arrows=True, with_labels=True, font_weight='bold')
+                # plt.show()
+                assert 1 == 0
+        else:
+            nodes = []
+            while(G.number_of_nodes()):
+                cursor = [node for node in G.nodes if G.in_degree(node) == 0]
+                if not cursor: return label, star_semantics
+                cursor = cursor[0]
+                nodes.append(cursor)
+                G.remove_node(cursor)
+            # If two-table queries that include one relationship-type table
+            if len(nodes) == 2 and nodes[-1] in relation_tables.keys() and nodes[0] in relation_tables[nodes[-1]]:
+                replacement = [t for t in relation_tables[nodes[-1]] if t != nodes[0]][0]
+                star_semantics[nodes[-1]] = __CONVERT_TABLE_SEMANTICS(replacement, schema)
+                nodes[-1] = replacement
+            label = ' with '.join([__CONVERT_TABLE_NAME(n, schema) for n in nodes])
+            star_semantics['global'] = label
+            if len(nodes) == 2:
+                star_semantics[nodes[0]] = __CONVERT_TABLE_SEMANTICS(nodes[-1], schema)
+                star_semantics[nodes[-1]] = __CONVERT_TABLE_SEMANTICS(nodes[0], schema)
+            else:
+                for n in nodes:
+                    star_semantics[n] = ' with '.join([__CONVERT_TABLE_NAME(nn, schema) for nn in nodes if nn != n])
+            # if len(nodes) == 2: print('3: ', label)
+            
+    # device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    # batch_size = 1
+    # scorer = LMScorer.from_pretrained("gpt2", device=device, batch_size=batch_size)
+    # print(scorer.sentence_score("student has pet", reduce="mean"))
+    # print(scorer.sentence_score("pet has student", reduce="mean"))
+    # print(scorer.sentence_score(["", ""]))
+
+    return label, star_semantics
+
+def _dig_group_labels(group: List, schema: Dict, join_tables: Set = set()):
+    output = __parse_group(group)
+    # `global` indicates non-group query
+    grouping_table = "global"
+    grouping_col = None
+    grouping_label = ""
+    for col in output:
+        _, col_name = col
+        grouping_table = col_name.split('.')[0]
+        # If grouping with foreign key, use the primary-key-table as the grouping semantics instead
+        if join_tables and col_name in schema['foreign_key_columns']:
+            indices = [i for i, x in enumerate(schema['foreign_key_columns']) if x == col_name]
+            for idx in indices:
+                fk_tables = schema['foreigns'][idx].split('-')
+                if any(t not in join_tables for t in fk_tables): continue
+                grouping_table = [t for t in fk_tables if t != grouping_table][0]
+        grouping_col = col_name
+        grouping_label += f'for each {__CONVERT_COLUMN_NAME(col_name, schema)}'
+        # phrases.append(label)
+    
+    return grouping_table, grouping_col, grouping_label
+
+def translate_where_having(where_having, schema, relation_tables, star_semantics=None, star_semantics_key=None):
+    # if isinstance(where_having, Dict): raise ValueError('Nested in nested!!!' % where_having)
+
+    res = ""
+    for idx, condition in enumerate(where_having[::2]):
+        not_op, op_id, val_unit, val1, val2 = condition
+        _, col_unit, _ = val_unit
+        _, col_name, _ = col_unit
+        col_name = col_name.strip('_')
+        col_name = star_semantics[star_semantics_key] if col_name == 'all' else __CONVERT_COLUMN_NAME(col_name, schema)
+        if not isinstance(val1, Dict):
+            if isinstance(val1, str): val1 = val1.strip('"%')
+            if isinstance(val2, str): val2 = val2.strip('"%')
+            if val1 != 'value': val1 = f'{val1} [MATCH]'
+            if val2 != 'value': val2 = f'{val2} [MATCH]'
+            # Between operator
+            if op_id == 1: pred = f'{col_name} is {WHERE_OPS[op_id]} {val1} and {val2}'
+            else: pred = f'{col_name} is {__CONVERT_OPERATOR_NAME(op_id)} {val1}'
+        else:
+            if __CHECK_AGG_IN_SELECT(val1):
+                agg = __CONVERT_AGG_NAME(val1['select'][1][0][0])
+                pred = f'{__CONVERT_OPERATOR_NAME(op_id)} {agg} {col_name}'
+                where = translate_where_having(val1['where'], schema, relation_tables)
+                if where: pred += f' that {where}'
+            elif val1['orderBy'] and val1['limit']:
+                order_label = f' {translate_order(val1["orderBy"], val1["limit"], val1["from"], schema=schema, relation_tables=relation_tables)}'
+                if op_id in [2, 7]:
+                    pred = f'{col_name} without' if op_id == 7 else f'{col_name} with'
+                    pred += order_label
+                else:
+                    from_label, _ = _dig_join_labels(val1["from"], schema, relation_tables)
+                    pred = f'{col_name} {__CONVERT_OPERATOR_NAME(op_id)} {from_label} with {order_label}'
+                continue
+            elif all(not val1[key] for key in ['intersect', 'union', 'except']):
+                pred = f'{col_name} without' if not_op else f'{col_name} with'
+                where = translate_where_having(val1['where'], schema, relation_tables)
+                if where: pred += f' {where}'
+                # If without where clause, use the table semantics to construct the label.
+                else: 
+                    from_, _ = _dig_join_labels(val1["from"], schema, relation_tables)
+                    pred += f' {from_}'
+            elif op_id == 8 and any(val1[key] for key in ['intersect', 'union', 'except']):
+                pred = f'{col_name} without' if not_op else f'{col_name} with'
+                subq = val1['intersect']
+                iue = 'and'
+                if val1['union']: 
+                    subq = val1['union']
+                    iue = 'or'
+                elif val1['except']: 
+                    subq = val1['except']
+                    iue = 'except'
+                # Use projection semantics to construct the label
+                if subq['from'] == val1['from'] and not val1['where'] and not subq['where']:
+                    from1, _ = _dig_join_labels(val1["from"], schema, relation_tables)
+                    from2, _ = _dig_join_labels(subq["from"], schema, relation_tables)
+                    pred += f' {translate_select(val1["select"], schema, star_semantics, star_semantics_key)} of {from1} {iue} {translate_select(subq["select"], schema, star_semantics, star_semantics_key)} of {from2}'
+                elif val1['where'] and subq['where']:
+                    pred += f' {translate_where_having(val1["where"], schema, relation_tables)} {iue} {translate_where_having(subq["where"], schema, relation_tables)}'
+            else:
+                raise ValueError('Not supported nested query type' % val1)
+        # Concatenate predicates
+        res += f'{pred} {where_having[1::2][idx]} ' if len(where_having[1::2]) > idx else f'{pred}'
+
+    return res
+
+def translate_order(order, limit, from_, schema, relation_tables):
+    res = ""
+    kw, output = __parse_order(order)
+    # Only handle one-attribute order case, and ignore aggregation
+    _, col_name = output[0]
+    if col_name == 'all': 
+        from_label, _ = _dig_join_labels(from_, schema, relation_tables=relation_tables)
+        col_name = from_label
+    else: col_name = __CONVERT_COLUMN_NAME(col_name, schema)
+    if limit and limit == 1:
+        if kw == 'desc': res = f'the most {col_name}'
+        else: res = f'the least {col_name}'
+    else: res = f'ordering by {col_name}'
+
+    return res
+
+def translate_select(select, schema, star_semantics, star_semantics_key = "global"):
+    output = __parse_select(select)
+    res = ""
+    for idx, col in enumerate(output):
+        if idx > 0: res += ', '
+        agg_id, col_name = col
+        col_label = star_semantics[star_semantics_key] if col_name == 'all' else __CONVERT_COLUMN_NAME(col_name, schema)
+        res += f'the {__CONVERT_AGG_NAME(agg_id)} {col_label}'
+
+    return res
+
+def _dig_where_having_labels(where: List, schema: Dict, relation_tables: Dict, star_semantics: Dict, star_semantics_key: str):
+    where_label = ""
+    predicate_dict = {}
+    for condition, conjuction in zip(where[::2], [''] + where[1::2]):
+        not_op, op_id, val_unit, val1, val2 = condition
+        unit_op, col_unit, col_unit1 = val_unit
+        _, col_name_full, _ = col_unit
+        col_name_full = col_name_full.strip('_')
+        col_name = star_semantics[star_semantics_key] if col_name_full == 'all' else __CONVERT_COLUMN_NAME(col_name_full, schema)
+        # head.salary - head.tax
+        if col_unit1: 
+            _, col_name1, _ = col_unit1
+            col_name1 = col_name1.strip('_')
+            col_name1 = star_semantics[star_semantics_key] if col_name1 == 'all' else __CONVERT_COLUMN_NAME(col_name1, schema)
+            col_name = f"{col_name} {__CONVERT_UNIT_OPERATOR_NAME(unit_op)} {col_name1}"
+            
+        if not isinstance(val1, Dict):
+            if isinstance(val1, str): val1 = val1.strip('"%')
+            if isinstance(val2, str): val2 = val2.strip('"%')
+            if val1 != 'value': val1 = f'{val1} [MATCH]'
+            if val2 != 'value': val2 = f'{val2} [MATCH]'
+            # Between operator
+            if op_id == 1: label = f'{col_name} is {WHERE_OPS[op_id]} {val1} and {val2}'
+            else: label = f'{col_name} is {__CONVERT_OPERATOR_NAME(op_id)} {val1}'
+            if conjuction == 'and' and op_id == 2 and col_name_full in predicate_dict.keys() and predicate_dict[col_name_full] == op_id: 
+                label += ' [CONFLICT]'
+            predicate_dict[col_name_full] = op_id
+            where_label += ' ' + conjuction + ' ' + label
+            # phrases.append(label)
+        # Nested query exists (TODO only consider the following four query syntax)
+        ## WHERE SurfaceArea  >  (SELECT min(SurfaceArea) FROM country WHERE Continent  =  \"Europe\")
+        ## WHERE stadium_id NOT IN (SELECT stadium_id FROM concert)      without any concert.
+        ## WHERE stuid NOT IN (SELECT T1.stuid FROM student AS T1 JOIN has_pet AS T2 JOIN pets AS T3 WHERE T3.pettype  =  'cat')      students who do not have a cat pet."
+        ## where stadium_id = (select stadium_id from stadium order by capacity desc limit 1)        stadium with the highest capacity .
+        ## WHERE AirportCode NOT IN (SELECT SourceAirport FROM Flights UNION SELECT DestAirport FROM Flights)         airports which do not have any flight in and out
+        else:
+            if __CHECK_AGG_IN_SELECT(val1):
+                agg = __CONVERT_AGG_NAME(val1['select'][1][0][0])
+                if __CHECK_ALIGN_WITH_COLUMNS(val1['select'][1][0], col_name, schema):
+                    label = f'{__CONVERT_OPERATOR_NAME(op_id)} {agg} {col_name}'
+                else:
+                    _, inter_val_unit = val1['select'][1][0]
+                    _, inter_col_unit, _ = inter_val_unit
+                    _, inter_col_name, _ = inter_col_unit
+                    inter_col_name = inter_col_name.strip('_')
+                    inter_col_name = __CONVERT_COLUMN_NAME(inter_col_name, schema)
+                    label = f'{col_name} {__CONVERT_OPERATOR_NAME(op_id)} {agg} {inter_col_name}'
+                where = translate_where_having(val1['where'], schema, relation_tables)
+                if where: label += f' that {where}'
+            elif val1['orderBy'] and val1['limit']:
+                order_label = f' {translate_order(val1["orderBy"], val1["limit"], val1["from"], schema=schema, relation_tables=relation_tables)}'
+                if op_id in [2, 7]:
+                    label = f'{col_name} without' if op_id == 7 else f'{col_name} with'
+                    label += order_label
+                else:
+                    from_label, _ = _dig_join_labels(val1["from"], schema, relation_tables)
+                    label = f'{col_name} {__CONVERT_OPERATOR_NAME(op_id)} {from_label} with {order_label}'
+                continue
+            elif all(not val1[key] for key in ['intersect', 'union', 'except']):
+                label = f'{col_name} without' if not_op else f'{col_name} with'
+                where = translate_where_having(val1['where'], schema, relation_tables)
+                if where: label += f' {where}'
+                # If without where clause, use the table semantics to construct the label.
+                else: 
+                    from_, _ = _dig_join_labels(val1["from"], schema, relation_tables)
+                    label += f' {from_}'
+            elif op_id == 8 and any(val1[key] for key in ['intersect', 'union', 'except']):
+                label = f'{col_name} without' if not_op else f'{col_name} with'
+                subq = val1['intersect']
+                iue = 'and'
+                if val1['union']: 
+                    subq = val1['union']
+                    iue = 'or'
+                elif val1['except']: 
+                    subq = val1['except']
+                    iue = 'except'
+                # Use projection semantics to construct the label
+                if subq['from'] == val1['from'] and not val1['where'] and not subq['where']:
+                    from1, _ = _dig_join_labels(val1["from"], schema, relation_tables)
+                    from2, _ = _dig_join_labels(subq["from"], schema, relation_tables)
+                    label += f' {translate_select(val1["select"], schema, star_semantics, star_semantics_key)} of {from1} {iue} {translate_select(subq["select"], schema, star_semantics, star_semantics_key)} of {from2}'
+                elif val1['where'] and subq['where']:
+                    label += f' {translate_where_having(val1["where"], schema, relation_tables)} {iue} {translate_where_having(subq["where"], schema, relation_tables)}'
+            else:
+                raise ValueError('Not supported nested query type' % val1)
+            where_label += ' ' + conjuction + ' ' + label
+            # phrases.append(label)
+
+    return where_label
+
+def _dig_order_labels(
+        order: Tuple, limit: int, 
+        schema: Dict, 
+        star_semantics: Dict, star_semantics_key: str,
+        grouping_col: str, 
+        phrases: List[str]):
+    '''Used for generating order-clause expression.
+
+    Consider two special semantics here:
+    - Star semantics
+    - Aggregation semantics augmented with grouping operation
+    '''
+    kw, output = __parse_order(order)
+    labels = []
+    has_agg = False
+    for col in output:
+        agg_id, col_name = col
+        if agg_id > 0: has_agg = True
+
+        col_label = star_semantics[star_semantics_key] if col_name == 'all' \
+            else __CONVERT_COLUMN_NAME(col_name, schema)
+        label = f'ordering by the {__CONVERT_AGG_NAME(agg_id)} {col_label}'
+        if limit and limit == 1:
+            if kw == 'desc': label = f'the most {__CONVERT_AGG_NAME(agg_id)} {col_label}'
+            else: label = f'the least {__CONVERT_AGG_NAME(agg_id)} {col_label}'
+        if agg_id > 0 and grouping_col:
+            label = __CONVERT_COLUMN_NAME(grouping_col, schema) + ' with ' + label
+        labels.append(label)
+    
+    order_label = ' and '.join(labels)
+    phrases.append(order_label)
+
+    return phrases, has_agg
+
+def _dig_select_labels(
+    select: Tuple, 
+    schema: Dict, 
+    star_semantics: Dict, star_semantics_key: str, 
+    grouping_col, 
+    phrases: List[str]):
+    '''Used for generating select-clause expression.
+
+    Consider five special semantics here:
+    - [FK] mark if foreign key column used
+    - [DUPLICATE] mark if existing repetitive projection
+    - Add table semantics to distinguish if the same-name columns used
+    - Star semantics
+    - Aggregation semantics augmented with grouping operation
+    '''
+    output = __parse_select(select)
+    
+    select_label = "find the "
+    has_agg = False
+    find_grouping_col = 0
+    labels = []
+    col_names = []
+    for col in output:
+        agg_id, col_name = col
+        if agg_id > 0: has_agg = True
+
+        col_label = star_semantics[star_semantics_key] if col_name == 'all' \
+            else __CONVERT_COLUMN_NAME(col_name, schema)
+        label = f'{__CONVERT_AGG_NAME(agg_id)} {col_label}'
+
+        if agg_id > 0 and grouping_col:
+            label = __CONVERT_COLUMN_NAME(grouping_col, schema) + ' with ' + label
+
+        if col_name in schema['foreign_key_columns']: 
+            label += ' [FK]'
+        
+        if col_name in col_names and label in labels:
+            pos = labels.index(label) if col_name == 'all' else col_names.index(col_name)
+            labels[pos] = f'{label} [DUPLICATE]'
+            # pos = phrases.index(label)
+            # phrases[pos] = phrases[pos] + ' ' + label
+        else: 
+            col_names.append(col_name)
+            labels.append(label)
+        # Check if grouping column found in projection
+        if grouping_col and col_name != 'all' and agg_id == 0:
+            # find_grouping_col = 2
+            if col_name.split('.')[1] == grouping_col.split('.')[1]: find_grouping_col = 2
+            # elif 'id' in col_name.split('.')[1] and 'name' in grouping_col or 'name' in col_name.split('.')[1] and 'id' in grouping_col:
+            elif find_grouping_col < 2: find_grouping_col = 1
+        
+    ambiguities = set([x for x in labels if labels.count(x) > 1])
+    if ambiguities:
+        for idx, label in enumerate(labels):
+            if label in ambiguities and 'all' not in label:
+                labels[idx] = f'{col_names[idx].split(".")[0]} {label}'
+                
+        # phrases.append(label)
+    select_label += ' and '.join(labels)
+    phrases.append(select_label)
+
+    return phrases, find_grouping_col, has_agg
+
+def _dig_iue_labels(iue: Dict, select: Tuple, schema: Dict, relation_tables: Dict, keyword=' except'):
+
+    def __CHECK_SELECT_CONSISTENT(select1, select2, schema):
+        output1 = __parse_select(select1)
+        output2 = __parse_select(select2)
+        for o in output1:
+            _, col_name = o
+            col_name = __CONVERT_COLUMN_NAME(col_name, schema) 
+            if all(col_name != __CONVERT_COLUMN_NAME(o2[1], schema) for o2 in output2): return False
+        return True
+
+    from_, star_semantics = _dig_join_labels(iue['from'], schema, relation_tables=relation_tables)
+    grouping_table, _, _ = _dig_group_labels(iue['groupBy'], schema)
+
+    label = keyword
+    if iue['where']: label += f' {translate_where_having(iue["where"], schema, relation_tables)}'
+    if iue['groupBy'] and iue['having']:
+        label += f' and {translate_where_having(iue["having"], schema, relation_tables, star_semantics, grouping_table)}' if iue['where'] else \
+            f' {translate_where_having(iue["having"], schema, relation_tables, star_semantics, grouping_table)}'
+    if not iue['where'] and not iue['groupBy'] and not iue['orderBy']:
+        # Use the select and from clause as the subquery semantics
+        if __CHECK_SELECT_CONSISTENT(iue['select'], select, schema): label += f' {from_}'
+        else: label += f' {translate_select(iue["select"], schema, star_semantics, grouping_table)} of {from_}'
+    # phrases.append(label)
+
+    return label
