@@ -134,7 +134,7 @@ Model  | Download Model
 `second-stage-ranker(lgesql)`  | [second-stage-ranker(lgesql).tar.gz](https://drive.google.com/file/d/1JPVvcO_nu3uneHF4yGKHrvk6sAZrFkNS/view?usp=share_link)
 `second-stage-ranker(resdsql)`  | [second-stage-ranker(resdsql).tar.gz](https://drive.google.com/file/d/1vEUDSA03cbyIncZ-hbBVVjTBCb4n1X6e/view?usp=share_link)
 `gap+metadata` | [gap+metadata.tar.gz](https://drive.google.com/file/d/1qrzRKIEA-iNBRylpS-1q4IxH4fY9Zdfg/view?usp=share_link)
-`lgesql+metadata`  | [lgesql+metadata.tar.gz](https://drive.google.com/file/d/1AKH2IfaANcwUfbEv2zSpR1M0SZzuS3Yw/view?usp=share_link)
+`lgesql+metadata`  | [lgesql+metadata.tar.gz](https://drive.google.com/file/d/1mc1aQiYCOaGbRp9-Whvha1Dzm2APv7wT/view?usp=sharing)
 `resdsql+metadata`  | [resdsql+metadata.tar.gz](https://drive.google.com/drive/folders/1rmHnNAmSXwnUV1Qyzgow7AlQWVAvqQvG?usp=sharing)
 
 Unpack the model checkpoints with the following directory structure:
