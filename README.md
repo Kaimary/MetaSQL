@@ -129,7 +129,7 @@ We have uploaded a multi-label classification model (implemented based on the LG
 
 Model  | Download Model
 ----|----
-`multi-label-classifier`  | [multi-label-classifier.tar.gz](https://drive.google.com/file/d/13oOEkAHwF7i0iiWgVBdcMBR8lijEuF4o/view?usp=share_link)
+`multi-label-classifier`  | [multi-label-classifier.tar.gz](https://drive.google.com/file/d/15sHP2DHgWFZF9zPuqL-8ePtaxEYZEhnr/view?usp=share_link)
 `first-stage-ranker`  | [first-stage-ranker.tar.gz](https://drive.google.com/file/d/1OulDBJEVcwkYkNRg6JVKKi5HpMI4TqUE/view?usp=share_link)
 `second-stage-ranker(lgesql)`  | [second-stage-ranker(lgesql).tar.gz](https://drive.google.com/file/d/1JPVvcO_nu3uneHF4yGKHrvk6sAZrFkNS/view?usp=share_link)
 `second-stage-ranker(resdsql)`  | [second-stage-ranker(resdsql).tar.gz](https://drive.google.com/file/d/1vEUDSA03cbyIncZ-hbBVVjTBCb4n1X6e/view?usp=share_link)
