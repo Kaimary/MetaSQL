@@ -19,6 +19,9 @@ The official repository contains the code and pre-trained models for our paper [
     <br />
 </p>
 
+## Watch The Video
+
+[![Watch the video](https://img.youtube.com/vi/uOZEY85Pdlg/maxresdefault.jpg)](https://youtu.be/uOZEY85Pdlg)
 ## 📖 Overview
 
 This code implements:
