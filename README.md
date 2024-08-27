@@ -1,7 +1,7 @@
 # <span style="font-size:0.8em;">M</span>etaSQL: A Generate-then-Rank Framework for Natural Language to SQL Translation
 > Improve NL2SQL with a unified generate-and-rank pipeline
 > 
-The official repository contains the code and pre-trained models for our paper [MetaSQL: A Generate-then-Rank Framework for Natural Language to SQL Translation](https://arxiv.org/abs/2402.17144).
+The official repository contains the code and pre-trained models for our paper [MetaSQL: A Generate-then-Rank Framework for Natural Language to SQL Translation]([https://arxiv.org/abs/2402.17144](https://ieeexplore.ieee.org/document/10597742)).
 
 <p align="center">
    <a href="https://github.com/kaimary/MetaSQL/blob/main/LICENSE">
