@@ -23,17 +23,9 @@ If you use our code in your study, or find MetaSQL useful, please cite it as fol
 
 ```bibtex
 @inproceedings{Yuankai2024:MetaSQL,
-  author       = {Yuankai Fan and
-                  Zhenying He and
-                  Tonghui Ren and
-                  Can Huang and
-                  Yinan Jing and
-                  Kai Zhang and
-                  X. Sean Wang},
-  title        = {MetaSQL: {A} Generate-Then-Rank Framework for Natural Language to
-                  {SQL} Translation},
-  booktitle    = {40th {IEEE} International Conference on Data Engineering, {ICDE} 2024,
-                  Utrecht, The Netherlands, May 13-16, 2024},
+  author       = {Yuankai Fan, Zhenying He, Tonghui Ren, Can Huang, Yinan Jing, Kai Zhang, X. Sean Wang},
+  title        = {MetaSQL: {A} Generate-Then-Rank Framework for Natural Language to {SQL} Translation},
+  booktitle    = {40th {IEEE} International Conference on Data Engineering, {ICDE} 2024, Utrecht, The Netherlands, May 13-16, 2024},
   pages        = {1765--1778},
   publisher    = {{IEEE}},
   year         = {2024},
