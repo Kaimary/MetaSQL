@@ -19,6 +19,32 @@ The official repository contains the code and pre-trained models for our paper [
     <br />
 </p>
 
+If you use our code in your study, or find MetaSQL useful, please cite it as follows:
+
+```bibtex
+@inproceedings{Yuankai2024:MetaSQL,
+  author       = {Yuankai Fan and
+                  Zhenying He and
+                  Tonghui Ren and
+                  Can Huang and
+                  Yinan Jing and
+                  Kai Zhang and
+                  X. Sean Wang},
+  title        = {MetaSQL: {A} Generate-Then-Rank Framework for Natural Language to
+                  {SQL} Translation},
+  booktitle    = {40th {IEEE} International Conference on Data Engineering, {ICDE} 2024,
+                  Utrecht, The Netherlands, May 13-16, 2024},
+  pages        = {1765--1778},
+  publisher    = {{IEEE}},
+  year         = {2024},
+  url          = {https://doi.org/10.1109/ICDE60146.2024.00143},
+  doi          = {10.1109/ICDE60146.2024.00143},
+  timestamp    = {Wed, 07 Aug 2024 07:59:36 +0200},
+  biburl       = {https://dblp.org/rec/conf/icde/FanHRHJZW24.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
+```
+
 ## Watch The Video
 
 [![Watch the video](https://img.youtube.com/vi/uOZEY85Pdlg/maxresdefault.jpg)](https://youtu.be/uOZEY85Pdlg)
