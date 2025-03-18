@@ -144,7 +144,7 @@ $ python script/second_ranker_train_script.py
 
 
 
-### 👍 Download the checkpoints
+### 👍 Download the Checkpoints
 
 We have uploaded a multi-label classification model (implemented based on the LGESQL model), a first-stage ranking model (trained on LGESQL ranking data) and two second-stage ranking models (trained by LGESQL and RESDSQL ranking data, respectively) checkpoints below. Meanwhile, we also shared the metadata-augmented pre-trained NL2SQL translation models for the four Seq2seq-based baseline models used in our experiments.
 
