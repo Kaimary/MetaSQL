@@ -1,0 +1,59 @@
+#### Text2SQL task: Give you database schema, NL question and metadata information of the target SQL, generate an executable and diversified SQL query for me.
+#### Learn from the generating example
+The database has Table College with columns 'cName', 'state', 'enr';
+Table Player with columns 'pID', 'pName', 'yCard', 'HS';
+Table Tryout with columns 'pID', 'cName', 'pPos', 'decision';
+
+
+The question is 'For each position, what is the maximum number of  hours for students who spent more than 1000 hours training?';
+the sql  must satisfied: filtering records using some restrictions(where) and Group by calculation is needed and Use join to connect the tables(join); The difficulty rating of the target SQL is 350;
+The target SQL is: SELECT max(T1.HS) ,  pPos FROM player AS T1 JOIN tryout AS T2 ON T1.pID  =  T2.pID WHERE T1.HS  >  1000 GROUP BY T2.pPos;
+
+The question is 'What are the names of colleges in LA that have more than 15,000 students and of colleges in AZ with less than 13,000 students?';
+the sql  must satisfied: filtering records using some restrictions(where) and Use join to connect the tables(join) and Solve the sub problems first; The difficulty rating of the target SQL is 500;
+The target SQL is: SELECT T2.pName FROM  tryout AS T1 JOIN player AS T2 ON T1.pID  =  T2.pID WHERE T1.cName  =  (SELECT cName FROM college ORDER BY enr DESC LIMIT 1);
+
+
+
+The database has Table GEOGRAPHIC with columns 'CITY_NAME', 'COUNTY', 'REGION';
+Table LOCATION with columns 'RESTAURANT_ID', 'HOUSE_NUMBER', 'STREET_NAME', 'CITY_NAME';
+Table RESTAURANT with columns 'ID', 'NAME', 'FOOD_TYPE', 'CITY_NAME', 'RATING';
+
+
+
+The question is 'What is the best restaurant in san francisco for french food?';
+the sql  must satisfied: filtering records using some restrictions(where) and Use join to connect the tables(join) and Solve the sub problems first(subquery) ; The difficulty rating of the target SQL is 600;
+The target SQL is: SELECT t2.house_number  ,  t1.name FROM restaurant AS t1 JOIN LOCATION AS t2 ON t1.id  =  t2.restaurant_id WHERE t2.city_name  =  "san francisco" AND t1.food_type  =  "french" AND t1.rating  =  ( SELECT MAX ( t1.rating ) FROM restaurant AS t1 JOIN LOCATION AS t2 ON t1.id  =  t2.restaurant_id WHERE t2.city_name  =  "san francisco" AND t1.food_type  =  "french" );
+
+
+The question is 'what is a good restaurant on bethel island rd in bethel island?';
+the sql  must satisfied: filtering records using some restrictions(where) and Use join to connect the tables(join); The difficulty rating of the target SQL is 300;
+The target SQL is: SELECT t2.house_number  ,  t1.name FROM restaurant AS t1 JOIN LOCATION AS t2 ON t1.id  =  t2.restaurant_id WHERE t2.city_name  =  "bethel island" AND t2.street_name  =  "bethel island rd" AND t1.rating  >  2.5;
+
+
+The database has Table club with columns 'Club_ID', 'name', 'Region', 'Start_year';
+Table club_rank with columns 'Rank', 'Club_ID', 'Gold', 'Silver', 'Bronze', 'Total';
+Table competition with columns 'Competition_ID', 'Year', 'Competition_type', 'Country';
+Table competition_result with columns 'Competition_ID', 'Club_ID_1', 'Club_ID_2', 'Score';
+Table player with columns 'Player_ID', 'name', 'Position', 'Club_ID', 'Apps', 'Tries', 'Goals', 'Points';
+
+
+The question is 'Show total points of all players.';
+the sql  must satisfied: very easy query,think straight forward; The difficulty rating of the target SQL is 100;
+The target SQL is: SELECT sum(Points) FROM player;
+
+
+The question is 'What are the positions of both players that have more than 20 points and less than 10 points?';
+the sql  must satisfied: filtering records using some restrictions(where) and use INTERSECT/EXCEPT/UNION to connect two clause; The difficulty rating of the target SQL is 400;
+The target SQL is: SELECT POSITION FROM player WHERE Points  >  20 INTERSECT SELECT POSITION FROM player WHERE Points  <  10;
+
+
+The question is 'What is the most common competition type?';
+the sql  must satisfied: Group by calculation is needed and Sorting(ORDER BY) of results is required; The difficulty rating of the target SQL is 300;
+The target SQL is: SELECT Competition_type FROM competition GROUP BY Competition_type ORDER BY COUNT(*) DESC LIMIT 1;
+
+
+
+
+
+
